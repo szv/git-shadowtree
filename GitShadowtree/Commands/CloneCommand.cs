@@ -5,16 +5,15 @@ namespace GitShadowtree.Commands;
 /// <summary>Adopts an existing shadowtree (onboarding): clones it and checks the files into the work tree.</summary>
 internal sealed class CloneCommand : Command
 {
-    private readonly Option<string> _remote = new("--remote", "-r")
+    private readonly Argument<string> _remote = new("remote")
     {
-        Required = true,
         Description = "The URL of the remote repository to clone the shadowtree from."
     };
 
     public CloneCommand() : base("clone", "Adopts an existing shadowtree (onboarding).")
     {
         Aliases.Add("setup");
-        Options.Add(_remote);
+        Arguments.Add(_remote);
         SetAction(Run);
     }
 
