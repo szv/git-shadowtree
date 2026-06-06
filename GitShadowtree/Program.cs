@@ -4,14 +4,16 @@ using GitShadowtree.Commands;
 
 var rootCommand = new RootCommand(
     "git-shadowtree - track a set of files (for example agent docs) in a separate repository, decoupled "
-    + "from the main remote. Any command other than init/clone/scan is forwarded to git against the shadowtree.")
+    + "from the main remote. Any command other than init/clone/add/commit/pull is forwarded to git against the shadowtree.")
 {
     TreatUnmatchedTokensAsErrors = false
 };
 
 rootCommand.Subcommands.Add(new InitCommand());
 rootCommand.Subcommands.Add(new CloneCommand());
-rootCommand.Subcommands.Add(new ScanCommand());
+rootCommand.Subcommands.Add(new AddCommand());
+rootCommand.Subcommands.Add(new CommitCommand());
+rootCommand.Subcommands.Add(new PullCommand());
 
 var configuration = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
 

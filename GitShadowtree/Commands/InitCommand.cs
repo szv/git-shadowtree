@@ -2,7 +2,7 @@ using System.CommandLine;
 
 namespace GitShadowtree.Commands;
 
-// Creates a new shadowtree from the files currently present in the work tree and pushes it.
+/// <summary>Creates a new shadowtree from the files currently in the work tree and pushes it.</summary>
 internal sealed class InitCommand : Command
 {
     private readonly Option<string> _remote = new("--remote", "-r")
@@ -31,6 +31,7 @@ internal sealed class InitCommand : Command
 
         var root = Shadowtree.Root();
         var gitDir = Shadowtree.GitDir(root);
+
         if (Directory.Exists(gitDir))
             throw new CommandException($"Shadowtree already exists: {gitDir}");
 
@@ -41,14 +42,18 @@ internal sealed class InitCommand : Command
         // Self-describing pattern list in the work tree (tracked by the shadowtree).
         Shadowtree.WritePatterns(root, patterns);
 
-        Shadowtree.Run(gitDir, root, ["add", .. patterns]);
-        Shadowtree.Run(gitDir, root, "add", "--", Shadowtree.PatternsFile);
+        Shadowtree.StagePatterns(gitDir, root, patterns);
         Shadowtree.Run(gitDir, root, "commit", "-m", "Add shadowtree files");
         Shadowtree.Run(gitDir, root, "branch", "-M", "main");
         Shadowtree.Run(gitDir, root, "remote", "add", "origin", remote);
         var code = Shadowtree.Run(gitDir, root, "push", "-u", "origin", "main");
 
-        Shadowtree.EnsureExcluded(root, patterns);
+        // Best-effort: point a local/file remote's HEAD at main so a plain `git clone` of it checks
+        // out cleanly. No-op for URL remotes, where the host manages the default branch.
+        if (code == 0)
+            Git.TryRun(root, $"--git-dir={remote}", "symbolic-ref", "HEAD", "refs/heads/main");
+
+        Shadowtree.SyncExclude(root, patterns);
         Console.WriteLine($"Shadowtree created: {gitDir}");
         return code;
     }

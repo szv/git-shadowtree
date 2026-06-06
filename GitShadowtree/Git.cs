@@ -2,8 +2,7 @@ using System.Diagnostics;
 
 namespace GitShadowtree;
 
-// Invokes git through the CLI. No LibGit2Sharp: the bare git-dir plus work-tree
-// shadowtree is exactly what the git CLI handles natively.
+/// <summary>Invokes git through the CLI (no LibGit2Sharp - the bare git-dir plus work-tree is handled natively).</summary>
 internal static class Git
 {
     public static int Run(string? workingDirectory, params string[] args)
@@ -12,6 +11,27 @@ internal static class Git
         if (workingDirectory is not null) psi.WorkingDirectory = workingDirectory;
         foreach (var arg in args) psi.ArgumentList.Add(arg);
         using var process = Start(psi);
+        process.WaitForExit();
+        return process.ExitCode;
+    }
+
+    /// <summary>
+    /// Like <see cref="Run"/> but swallows output and never throws - returns just the exit code,
+    /// for best-effort calls where a non-matching pattern (exit 128) is expected.
+    /// </summary>
+    public static int TryRun(string? workingDirectory, params string[] args)
+    {
+        var psi = new ProcessStartInfo("git")
+        {
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        if (workingDirectory is not null) psi.WorkingDirectory = workingDirectory;
+        foreach (var arg in args) psi.ArgumentList.Add(arg);
+        using var process = Start(psi);
+        process.StandardOutput.ReadToEnd();
+        process.StandardError.ReadToEnd();
         process.WaitForExit();
         return process.ExitCode;
     }
