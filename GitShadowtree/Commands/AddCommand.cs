@@ -14,7 +14,7 @@ internal sealed class AddCommand : Command
     {
         var root = Shadowtree.Root();
         Shadowtree.StagePatterns(Shadowtree.GitDir(root), root, Shadowtree.LoadPatterns(root));
-        Console.WriteLine("Staged matching files. Review with 'git-shadowtree status', then 'git-shadowtree commit'.");
+        Console.WriteLine("Staged matching files. Review with 'git shadowtree status', then 'git shadowtree commit'.");
         return 0;
     }
 }

@@ -7,9 +7,9 @@ internal static class Shadowtree
     public const string PatternsFile = ".shadowtree";
 
     /// <summary>Start of the tool-managed block in the main repo's info/exclude.</summary>
-    public const string ExcludeBegin = "# BEGIN git-shadowtree (managed) - do not edit; mirrors .shadowtree";
+    public const string ExcludeBegin = "# BEGIN git shadowtree (managed) - do not edit; mirrors .shadowtree";
     /// <summary>End of the tool-managed block in the main repo's info/exclude.</summary>
-    public const string ExcludeEnd = "# END git-shadowtree (managed)";
+    public const string ExcludeEnd = "# END git shadowtree (managed)";
 
     public static readonly string[] DefaultPatterns =
     [
@@ -61,7 +61,7 @@ internal static class Shadowtree
     {
         string[] lines =
         [
-            "# git-shadowtree patterns (gitignore syntax). Matching files are tracked in the shadowtree.",
+            "# git shadowtree patterns (gitignore syntax). Matching files are tracked in the shadowtree.",
             .. patterns,
         ];
         File.WriteAllLines(Path.Combine(root, PatternsFile), lines);
