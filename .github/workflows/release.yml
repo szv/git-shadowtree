@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Release (win-x64)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Determine version
+        id: version
+        shell: pwsh
+        run: |
+          $version = "$env:GITHUB_REF_NAME" -replace '^v', ''
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Version: $version"
+
+      - name: Publish (NativeAOT)
+        run: dotnet publish GitShadowtree/GitShadowtree.csproj -c Release -r win-x64 -p:Version=${{ steps.version.outputs.version }} -o publish
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          New-Item -ItemType Directory -Path staging | Out-Null
+          Copy-Item publish/git-shadowtree.exe staging/
+          Copy-Item README.md, LICENSE staging/
+          Compress-Archive -Path staging/* -DestinationPath "git-shadowtree-$version-win-x64.zip"
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$env:GITHUB_REF_NAME" "git-shadowtree-${{ steps.version.outputs.version }}-win-x64.zip" --title "git shadowtree ${{ steps.version.outputs.version }}" --generate-notes
