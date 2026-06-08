@@ -8,7 +8,7 @@ Git Shadowtree is a tool that allows you to maintain a separate "shadow" reposit
 
 ## Scoop
 ```
-scoop install https://raw.githubusercontent.com/szv/git-shadowtree/refs/heads/main/scoop/git-shadowtree.json
+scoop install https://raw.githubusercontent.com/szv/git-shadowtree/main/scoop/git-shadowtree.json
 ```
 
 ### WinGet
