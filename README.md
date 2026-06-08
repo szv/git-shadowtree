@@ -6,7 +6,12 @@ Git Shadowtree is a tool that allows you to maintain a separate "shadow" reposit
 
 ## Installation
 
-### WinGet (recommended)
+## Scoop
+```
+scoop install https://raw.githubusercontent.com/szv/git-shadowtree/refs/heads/main/scoop/git-shadowtree.json
+```
+
+### WinGet
 ```
 winget install Szv.GitShadowtree
 ```
