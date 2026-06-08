@@ -13,7 +13,7 @@ winget install Szv.GitShadowtree
 Open a new terminal afterwards so the updated PATH takes effect, then use `git shadowtree …`.
 
 ### Manual
-1. Download the latest release of Git Shadowtree from the [releases page](...).
+1. Download the latest release of Git Shadowtree from the [releases page](https://github.com/szv/git-shadowtree/releases).
 2. Extract the downloaded archive to a directory of your choice.
 3. Add the directory containing the `git-shadowtree` executable to your system's PATH environment variable.  
 Open a new terminal afterwards so the updated PATH takes effect, then use `git shadowtree …`.
