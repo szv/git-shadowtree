@@ -11,6 +11,14 @@ internal static class Shadowtree
     /// <summary>End of the tool-managed block in the main repo's info/exclude.</summary>
     public const string ExcludeEnd = "# END git shadowtree (managed)";
 
+    /// <summary>Marker identifying the tool-managed post-checkout hook (so we never clobber a foreign one).</summary>
+    public const string HookMarker = "# BEGIN git shadowtree (managed)";
+
+    /// <summary>Advice printed when a foreign post-checkout hook is found and left untouched.</summary>
+    public const string ForeignHookNotice =
+        "Note: an existing post-checkout hook was left untouched. Add this line to it so new worktrees "
+        + "get the shadowtree:\n  git-shadowtree hook post-checkout \"$1\" \"$2\" \"$3\" >/dev/null 2>&1 || true";
+
     public static readonly string[] DefaultPatterns =
     [
         "AGENTS.md",
@@ -41,6 +49,33 @@ internal static class Shadowtree
     /// <summary>Captures stdout of a git command against the shadowtree; throws on a non-zero exit.</summary>
     public static string Out(string gitDir, string root, params string[] args)
         => Git.Out(root, [$"--git-dir={gitDir}", $"--work-tree={root}", .. args]);
+
+    /// <summary>
+    /// Configures a freshly-created bare git-dir (as <c>clone</c> does), checks out <c>main</c> into the
+    /// work tree, and mirrors the patterns into info/exclude. Returns the checkout exit code (0 on success).
+    /// </summary>
+    public static int Provision(string gitDir, string root)
+    {
+        Run(gitDir, root, "config", "status.showUntrackedFiles", "no");
+        Run(gitDir, root, "config", "core.autocrlf", "false");
+
+        // A bare clone mirrors refs into refs/heads/* and sets no upstream, so a plain push/pull
+        // wouldn't know where main goes. Wire it up so they just work.
+        Run(gitDir, root, "config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*");
+        Run(gitDir, root, "config", "branch.main.remote", "origin");
+        Run(gitDir, root, "config", "branch.main.merge", "refs/heads/main");
+        // Seed the remote-tracking ref from the cloned main (no extra fetch) so the upstream resolves;
+        // otherwise checkout/status warn that the upstream "is gone".
+        TryRun(gitDir, root, "update-ref", "refs/remotes/origin/main", "refs/heads/main");
+
+        // Check out main explicitly: a cloned bare remote may keep HEAD on another branch (e.g. master),
+        // where a plain checkout -f fails with "branch yet to be born". Surface failures.
+        var code = Run(gitDir, root, "checkout", "-f", "main");
+        if (code != 0) return code;
+
+        SyncExclude(root, LoadPatterns(root));
+        return code;
+    }
 
     /// <summary>Reads the tracked patterns (gitignore syntax), falling back to the defaults.</summary>
     public static string[] LoadPatterns(string root)
@@ -130,4 +165,65 @@ internal static class Shadowtree
         lines.AddRange(block);
         File.WriteAllLines(exclude, lines);
     }
+
+    /// <summary>
+    /// The hooks directory git uses for this repo: <c>core.hooksPath</c> if set, otherwise the repo's
+    /// (common) hooks dir, which is shared across all worktrees - so installing once covers them all.
+    /// </summary>
+    public static string HooksDir(string root)
+    {
+        string configured;
+        try { configured = Git.Out(root, "config", "--get", "core.hooksPath"); }
+        catch (CommandException) { configured = string.Empty; } // unset: git config exits non-zero
+
+        var path = configured.Length > 0 ? configured : Git.Out(root, "rev-parse", "--git-path", "hooks");
+        return Path.GetFullPath(path, root);
+    }
+
+    /// <summary>
+    /// Installs (or refreshes) the post-checkout hook that provisions the shadowtree in new worktrees.
+    /// A foreign (non-managed) hook is left untouched unless <paramref name="force"/> is set; returns
+    /// <c>false</c> in that case so the caller can advise the user.
+    /// </summary>
+    public static bool InstallHook(string root, bool force = false)
+    {
+        var hooksDir = HooksDir(root);
+        Directory.CreateDirectory(hooksDir);
+        var hookPath = Path.Combine(hooksDir, "post-checkout");
+
+        if (!force && File.Exists(hookPath) && !File.ReadAllText(hookPath).Contains(HookMarker))
+            return false;
+
+        // LF endings, no BOM (File.WriteAllText defaults to UTF-8 without BOM) - required by /bin/sh.
+        File.WriteAllText(hookPath, PostCheckoutHook());
+
+        // Git for Windows runs hooks via its bundled sh regardless of the exec bit; elsewhere set it.
+        if (!OperatingSystem.IsWindows())
+            File.SetUnixFileMode(hookPath,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+                | UnixFileMode.GroupRead | UnixFileMode.GroupExecute
+                | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+        return true;
+    }
+
+    /// <summary>
+    /// The managed post-checkout hook. Kept deliberately thin - all logic lives in the tool
+    /// (<c>git shadowtree hook post-checkout</c>) so an installed hook never needs rewriting.
+    /// </summary>
+    private static string PostCheckoutHook() => string.Join('\n',
+        "#!/bin/sh",
+        HookMarker + " - do not edit",
+        "# Provisions the shadowtree in freshly-added worktrees (git worktree add).",
+        // Plain `git worktree add` exports none of these, so this is insurance for tool-driven worktree
+        // creation (e.g. invoked from within another git hook, or by a wrapper/CI that pins the git env).
+        // Without it our checkout would write into the *caller's* index, not the new shadowtree's:
+        // --git-dir/--work-tree do NOT override GIT_INDEX_FILE (it has no flag), so an inherited one
+        // makes `checkout` overwrite the MAIN repo's index with the shadow tree -> corruption
+        // (`fatal: unable to read <oid>`, since those blobs only exist in the shadow object store).
+        "# Clear inherited git env so the tool resolves the new worktree, not the caller's repo/index.",
+        "unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "git-shadowtree hook post-checkout \"$1\" \"$2\" \"$3\" >/dev/null 2>&1",
+        "exit 0", // post-checkout's exit code is propagated by `git worktree add`; never fail it.
+        "# END git shadowtree (managed)",
+        "");
 }

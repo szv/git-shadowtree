@@ -10,6 +10,7 @@ Git Shadowtree is a tool that allows you to maintain a separate "shadow" reposit
 ```
 scoop install https://raw.githubusercontent.com/szv/git-shadowtree/main/scoop/git-shadowtree.json
 ```
+Open a new terminal afterwards so the updated PATH takes effect, then use `git shadowtree …`.
 
 ### WinGet
 ```
@@ -68,3 +69,14 @@ To **pull** changes from the remote shadow repository, you can use the `git shad
 ```
 git shadowtree pull
 ```
+
+### Worktrees
+`git shadowtree init` and `git shadowtree clone` install a `post-checkout` git hook. When you create a new worktree with plain `git worktree add <path>`, the hook automatically provisions a shadowtree for that worktree (cloned from the primary worktree's shadowtree) and checks the tracked files into it. This means tools that create worktrees on their own (for example, agents) get the shadowtree files without any extra step.
+
+Each worktree gets its own shadowtree, so changes are synced between worktrees through the remote via `git shadowtree push` / `git shadowtree pull`.
+
+If you set up your shadowtree before this feature existed (no hook installed yet), install it once with:
+```
+git shadowtree install-hook
+```
+The hook is shared across all worktrees, so a single install covers every future `git worktree add`. An existing, non-managed `post-checkout` hook is left untouched (use `--force` to overwrite, or add the printed one-line call to your hook).

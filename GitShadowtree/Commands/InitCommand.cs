@@ -54,6 +54,11 @@ internal sealed class InitCommand : Command
             Git.TryRun(root, $"--git-dir={remote}", "symbolic-ref", "HEAD", "refs/heads/main");
 
         Shadowtree.SyncExclude(root, patterns);
+
+        // Install the post-checkout hook so future `git worktree add`s get their own shadowtree.
+        if (!Shadowtree.InstallHook(root))
+            Console.WriteLine(Shadowtree.ForeignHookNotice);
+
         Console.WriteLine($"Shadowtree created: {gitDir}");
         return code;
     }

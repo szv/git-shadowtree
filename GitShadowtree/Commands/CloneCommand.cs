@@ -27,24 +27,14 @@ internal sealed class CloneCommand : Command
         if (!Directory.Exists(gitDir))
             Git.Run(root, "clone", "--bare", remote, gitDir);
 
-        Shadowtree.Run(gitDir, root, "config", "status.showUntrackedFiles", "no");
-        Shadowtree.Run(gitDir, root, "config", "core.autocrlf", "false");
-
-        // `git clone --bare` mirrors refs into refs/heads/* and sets no upstream, so a plain
-        // push/pull wouldn't know where main goes. Match init's setup so they just work.
-        Shadowtree.Run(gitDir, root, "config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*");
-        Shadowtree.Run(gitDir, root, "config", "branch.main.remote", "origin");
-        Shadowtree.Run(gitDir, root, "config", "branch.main.merge", "refs/heads/main");
-        // Seed the remote-tracking ref from the cloned main (no extra fetch) so the upstream
-        // resolves; otherwise checkout/status warn that the upstream "is gone".
-        Shadowtree.TryRun(gitDir, root, "update-ref", "refs/remotes/origin/main", "refs/heads/main");
-
-        // Check out `main` explicitly: a cloned bare remote may keep HEAD on another branch (e.g.
-        // master), where a plain `checkout -f` fails with "branch yet to be born". Surface failures.
-        var code = Shadowtree.Run(gitDir, root, "checkout", "-f", "main"); // Pull the files into the work tree.
+        // Configure, check out main into the work tree, and mirror the patterns into info/exclude.
+        var code = Shadowtree.Provision(gitDir, root);
         if (code != 0) return code;
 
-        Shadowtree.SyncExclude(root, Shadowtree.LoadPatterns(root));
+        // Install the post-checkout hook so future `git worktree add`s get their own shadowtree.
+        if (!Shadowtree.InstallHook(root))
+            Console.WriteLine(Shadowtree.ForeignHookNotice);
+
         Console.WriteLine($"Shadowtree set up: {gitDir}");
         return 0;
     }
