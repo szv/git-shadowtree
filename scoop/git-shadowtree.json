@@ -17,7 +17,7 @@
   "autoupdate": {
     "architecture": {
       "64bit": {
-        "url": "https://github.com/szv/git-shadowtree/releases/download/v0.0.2/git-shadowtree-$version-win-x64.zip"
+        "url": "https://github.com/szv/git-shadowtree/releases/download/v$version/git-shadowtree-$version-win-x64.zip"
       }
     }
   }
