@@ -103,13 +103,16 @@ internal static class Shadowtree
     }
 
     /// <summary>
-    /// Stages every match plus <see cref="PatternsFile"/>, one pattern at a time so a non-matching
-    /// one does not abort the rest. Picks up deletions; additive only - never untracks.
+    /// Stages every match (new, modified, and deleted) plus <see cref="PatternsFile"/>, one pattern at
+    /// a time so a non-matching one does not abort the rest (git add fails the whole invocation if any
+    /// single pathspec matches nothing). Additive only - never untracks.
     /// </summary>
     public static void StagePatterns(string gitDir, string root, IReadOnlyList<string> patterns)
     {
-        foreach (var pattern in patterns.Append(PatternsFile))
-            TryRun(gitDir, root, "add", "--", pattern);
+        foreach (var pattern in patterns)
+            TryRun(gitDir, root, "add", "--", ToPathspec(pattern));
+
+        TryRun(gitDir, root, "add", "--", PatternsFile);
     }
 
     /// <summary>
@@ -120,8 +123,8 @@ internal static class Shadowtree
     {
         StagePatterns(gitDir, root, patterns);
 
-        var covered = TrackedFiles(gitDir, root, patterns);
-        string[] orphans = [.. TrackedFiles(gitDir, root, [])
+        var covered = CoveredFiles(gitDir, root, patterns);
+        string[] orphans = [.. TrackedFiles(gitDir, root)
             .Where(file => file != PatternsFile && !covered.Contains(file))];
 
         if (orphans.Length > 0)
@@ -130,11 +133,42 @@ internal static class Shadowtree
         return orphans;
     }
 
-    /// <summary>Tracked paths, optionally restricted to those matching the pathspecs. Uses -z for verbatim, NUL-split paths.</summary>
-    private static HashSet<string> TrackedFiles(string gitDir, string root, IReadOnlyList<string> pathspecs)
+    /// <summary>All paths in the shadow index. Uses -z for verbatim, NUL-split paths.</summary>
+    private static HashSet<string> TrackedFiles(string gitDir, string root)
+        => [.. Out(gitDir, root, "ls-files", "-z").Split('\0', StringSplitOptions.RemoveEmptyEntries)];
+
+    /// <summary>
+    /// Indexed paths still matching the patterns - the set <see cref="SyncIndex"/> keeps. Index-only
+    /// (<c>ls-files --cached</c>, no work-tree walk) and, unlike <c>add</c>, unaffected by a pattern
+    /// that matches nothing, so a single call covers them all.
+    /// </summary>
+    private static HashSet<string> CoveredFiles(string gitDir, string root, IReadOnlyList<string> patterns)
     {
-        string[] args = pathspecs.Count > 0 ? ["ls-files", "-z", "--", .. pathspecs] : ["ls-files", "-z"];
-        return [.. Out(gitDir, root, args).Split('\0', StringSplitOptions.RemoveEmptyEntries)];
+        string[] pathspecs = [.. patterns.Select(ToPathspec)];
+        var output = Out(gitDir, root, ["ls-files", "--cached", "-z", "--", .. pathspecs]);
+        return [.. output.Split('\0', StringSplitOptions.RemoveEmptyEntries)];
+    }
+
+    /// <summary>
+    /// Translates a gitignore pattern into the equivalent <c>:(glob)</c> git pathspec, so staging
+    /// matches the same files the mirrored info/exclude hides. The crux: a slashless pattern like
+    /// <c>CLAUDE.md</c> matches at <em>every</em> depth in gitignore (e.g. <c>frontend/CLAUDE.md</c>),
+    /// whereas a bare pathspec anchors it to the repo root - so it gets a <c>**/</c> prefix. A pattern
+    /// that already contains a slash is anchored to the root either way; a leading <c>!</c> becomes an
+    /// exclude pathspec. Letting <c>git add</c> resolve these keeps its cheap pruning of ignored
+    /// directories (e.g. node_modules), which a <c>ls-files --others</c> scan would forfeit.
+    /// </summary>
+    private static string ToPathspec(string pattern)
+    {
+        var negate = pattern.StartsWith('!');
+        var body = (negate ? pattern[1..] : pattern).TrimEnd('/'); // a trailing-slash dir matches via the dir name
+
+        if (body.StartsWith('/'))
+            body = body[1..];          // leading '/' just anchors to the root
+        else if (!body.Contains('/'))
+            body = "**/" + body;   // slashless -> match at any depth
+
+        return $":({(negate ? "glob,exclude" : "glob")}){body}";
     }
 
     /// <summary>
