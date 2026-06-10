@@ -24,10 +24,15 @@ internal sealed class PullCommand : Command
         string[] pullArgs = tokens.Length > 0 ? ["pull", .. tokens] : ["pull", "origin", "main"];
         var code = Shadowtree.Run(gitDir, root, pullArgs);
 
-        // The exclude is not tracked by the shadowtree, so mirror it from the just-pulled patterns.
-        // Skip on a failed pull (e.g. merge conflict) so a conflicted .shadowtree is not mirrored.
+        // Skip on a failed pull (e.g. merge conflict) so a conflicted .shadowtree is not acted on.
         if (code == 0)
-            Shadowtree.SyncExclude(root, Shadowtree.LoadPatterns(root));
+        {
+            // A pull can change or remove .shadowtree; keep it present and staged, then mirror the
+            // exclude (which lives in the main repo, not the shadowtree) from the resulting patterns.
+            var patterns = Shadowtree.LoadPatterns(root);
+            Shadowtree.EnsurePatternsFileStaged(gitDir, root, patterns);
+            Shadowtree.SyncExclude(root, patterns);
+        }
 
         return code;
     }

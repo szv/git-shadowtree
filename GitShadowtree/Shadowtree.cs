@@ -73,7 +73,11 @@ internal static class Shadowtree
         var code = Run(gitDir, root, "checkout", "-f", "main");
         if (code != 0) return code;
 
-        SyncExclude(root, LoadPatterns(root));
+        // `init` commits .shadowtree, so a clone checks it out; ensure and stage it here too so a
+        // source that somehow lacked it still ends up with it present, tracked, and staged.
+        var patterns = LoadPatterns(root);
+        EnsurePatternsFileStaged(gitDir, root, patterns);
+        SyncExclude(root, patterns);
         return code;
     }
 
@@ -111,6 +115,25 @@ internal static class Shadowtree
     {
         foreach (var pattern in patterns)
             TryRun(gitDir, root, "add", "--", ToPathspec(pattern));
+
+        EnsurePatternsFileStaged(gitDir, root, patterns);
+    }
+
+    /// <summary>
+    /// Guarantees <see cref="PatternsFile"/> exists in the work tree and stages it, so .shadowtree is
+    /// always tracked and staged in the shadowtree. If it was removed from the work tree but is still
+    /// in the shadow index, it is restored from there (keeping any custom patterns); only when the
+    /// shadowtree has never had one is a fresh file synthesized from <paramref name="patterns"/>
+    /// (the defaults when none are on disk).
+    /// </summary>
+    public static void EnsurePatternsFileStaged(string gitDir, string root, IReadOnlyList<string> patterns)
+    {
+        // Restore a missing .shadowtree from the staged copy, else the committed (HEAD) copy - both keep
+        // any custom patterns; only when neither has it (the shadowtree never tracked one) synthesize it.
+        if (!File.Exists(Path.Combine(root, PatternsFile))
+            && TryRun(gitDir, root, "checkout", "--", PatternsFile) != 0
+            && TryRun(gitDir, root, "checkout", "HEAD", "--", PatternsFile) != 0)
+            WritePatterns(root, patterns);
 
         TryRun(gitDir, root, "add", "--", PatternsFile);
     }
