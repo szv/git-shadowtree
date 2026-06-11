@@ -4,6 +4,8 @@
 
 Git Shadowtree is a tool that allows you to maintain a separate "shadow" repository alongside your main Git repository. The shadow repository can be used to track specific files and directories that you want to keep separate from the main repository, while still being able to track them in the shadow repository.
 
+![GitShadowtreeIllustration](./assets/git_shadowtree_shared_worktree.svg)
+
 ## Installation
 
 ## Scoop
