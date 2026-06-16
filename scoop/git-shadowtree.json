@@ -1,12 +1,12 @@
 {
   "$schema": "https://raw.githubusercontent.com/ScoopInstaller/Scoop/master/schema.json",
-  "version": "0.0.4",
+  "version": "0.1.0",
   "description": "This tool allows you to maintain a separate \"shadow\" repository alongside your main Git repository.",
   "license": "MIT",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/szv/git-shadowtree/releases/download/v0.0.4/git-shadowtree-0.0.4-win-x64.zip",
-      "hash": "sha256:16efcf3480af9a9020efc04648e697e3693fc973e7ef6a463e18185ae2bba65b"
+      "url": "https://github.com/szv/git-shadowtree/releases/download/v0.1.0/git-shadowtree-0.1.0-win-x64.zip",
+      "hash": "sha256:094ea6b103b06e2c3d3963bb46037e53c2e093aaa3de8a54d64f94139c82b177"
     }
   },
   "homepage": "https://github.com/szv/git-shadowtree",
