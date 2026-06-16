@@ -31,12 +31,14 @@ internal static class Shadowtree
     /// <summary>Root of the current repository, used as the shadowtree work tree.</summary>
     public static string Root() => Git.Out(Directory.GetCurrentDirectory(), "rev-parse", "--show-toplevel");
 
-    /// <summary>The bare shadowtree git-dir, kept under the user profile's .shadowtrees folder.</summary>
+    /// <summary>
+    /// The bare shadowtree git-dir, resolved via <c>rev-parse --git-path shadowtree.git</c> so it lands
+    /// inside the repo's git-dir — invisible to <c>git status</c>, safe from <c>git clean</c>, and
+    /// per-worktree by construction. <see cref="Path.GetFullPath(string, string)"/> handles the
+    /// relative (primary) vs. absolute (linked worktree) result difference.
+    /// </summary>
     public static string GitDir(string root)
-    {
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return Path.Combine(home, ".shadowtrees", new DirectoryInfo(root).Name + ".git");
-    }
+        => Path.GetFullPath(Git.Out(root, "rev-parse", "--git-path", "shadowtree.git"), root);
 
     /// <summary>Runs a git command against the shadowtree (bare git-dir overlaid on the work tree).</summary>
     public static int Run(string gitDir, string root, params string[] args)
